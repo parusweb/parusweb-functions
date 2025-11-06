@@ -1,0 +1,474 @@
+/**
+ * ============================================================================
+ * PARUSWEB FUNCTIONS - ADMIN STYLES
+ * ============================================================================
+ * 
+ * Стили для административной панели WordPress
+ * 
+ * @package ParusWeb_Functions
+ * @version 2.0.0
+ */
+
+/* ============================================================================
+   СТРАНИЦА УПРАВЛЕНИЯ МОДУЛЯМИ
+   ============================================================================ */
+
+.parusweb-modules-page {
+    max-width: 1400px;
+}
+
+.parusweb-modules-page .card {
+    padding: 0;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    max-width:100%;
+}
+
+.parusweb-modules-page .card h2,
+.parusweb-modules-page .card h3 {
+    margin: 0;
+    padding: 15px 20px;
+    background: #f0f0f1;
+    border-bottom: 1px solid #c3c4c7;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.parusweb-modules-page .card table {
+    margin: 0;
+}
+
+.parusweb-modules-page .module-group {
+    margin-bottom: 30px;
+}
+
+.parusweb-modules-page .wp-list-table {
+    border: none;
+}
+
+.parusweb-modules-page .wp-list-table th {
+    background: #fafafa;
+    font-weight: 600;
+    padding: 12px 10px;
+}
+
+.parusweb-modules-page .wp-list-table td {
+    padding: 12px 10px;
+    vertical-align: middle;
+}
+
+.parusweb-modules-page .wp-list-table tr:hover {
+    background: #f8f8f8;
+}
+
+/* Чекбоксы модулей */
+.parusweb-modules-page .module-checkbox {
+    margin: 0;
+    cursor: pointer;
+}
+
+.parusweb-modules-page .module-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Бейджи зависимостей */
+.dependency-badge {
+    display: inline-block;
+    background: #e0e0e0;
+    color: #333;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    margin: 2px;
+    white-space: nowrap;
+}
+
+.no-deps {
+    color: #999;
+    font-style: italic;
+}
+
+/* Статусы модулей */
+.status-loaded {
+    color: #46b450;
+    font-weight: 600;
+}
+
+.status-loaded::before {
+    content: "✓ ";
+}
+
+.status-pending {
+    color: #f0b849;
+    font-weight: 600;
+}
+
+.status-pending::before {
+    content: "○ ";
+}
+
+.status-error {
+    color: #dc3232;
+    font-weight: 600;
+}
+
+.status-error::before {
+    content: "⚠ ";
+}
+
+.status-disabled {
+    color: #999;
+}
+
+.status-disabled::before {
+    content: "− ";
+}
+
+/* Информационная панель */
+.parusweb-info {
+    padding: 20px;
+    background: #fff;
+}
+
+.parusweb-info h3 {
+    margin-top: 0;
+    padding: 0 0 10px 0;
+    border-bottom: 2px solid #3aa655;
+    color: #3aa655;
+}
+
+.parusweb-info p {
+    margin: 8px 0;
+}
+
+/* Кнопка сохранения */
+.parusweb-modules-page .button-primary {
+    background: #3aa655;
+    border-color: #2e8a44;
+    font-size: 14px;
+    padding: 8px 20px;
+    height: auto;
+}
+
+.parusweb-modules-page .button-primary:hover {
+    background: #2e8a44;
+    border-color: #247035;
+}
+
+/* ============================================================================
+   МЕТАПОЛЯ ТОВАРОВ
+   ============================================================================ */
+
+/* Группа полей фальшбалок */
+.falsebalk_shapes_group {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 5px;
+}
+
+.falsebalk_shapes_group h3 {
+    margin-top: 0;
+    color: #3aa655;
+    border-bottom: 2px solid #3aa655;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.falsebalk_shapes_group h4 {
+    margin-top: 0;
+    color: #333;
+    font-size: 15px;
+}
+
+.falsebalk_shapes_group > div {
+    padding: 15px;
+    margin: 12px 0;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+}
+
+/* Поля услуг покраски */
+.painting-services-fields {
+    background: #f0f7ff;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    border-left: 4px solid #2196f3;
+}
+
+.painting-services-fields h4 {
+    margin-top: 0;
+    color: #1976d2;
+}
+
+/* Поля множителей */
+.multiplier-fields-wrapper {
+    background: #fff3e0;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    border-left: 4px solid #ff9800;
+}
+
+.multiplier-fields-wrapper h4 {
+    margin-top: 0;
+    color: #f57c00;
+}
+
+/* ============================================================================
+   НАСТРОЙКИ КАТЕГОРИЙ
+   ============================================================================ */
+
+.category-pricing-settings {
+    background: #fff;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.category-pricing-settings h3 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #3aa655;
+    color: #3aa655;
+}
+
+.category-pricing-settings .form-field {
+    margin-bottom: 20px;
+}
+
+.category-pricing-settings label {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.category-pricing-settings input[type="number"],
+.category-pricing-settings input[type="text"] {
+    width: 100%;
+    max-width: 300px;
+}
+
+/* ============================================================================
+   СТРАНИЦА ЗАКАЗА
+   ============================================================================ */
+
+/* Реквизиты юридического лица */
+.order-company-details {
+    background: #f0f0f1;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+}
+
+.order-company-details h3 {
+    margin-top: 0;
+    padding: 10px;
+    background: #fff;
+    border-left: 4px solid #3aa655;
+}
+
+.order-company-details p {
+    margin: 5px 0;
+    padding: 8px 10px;
+    background: #fff;
+    border-radius: 3px;
+}
+
+/* Данные калькуляторов в заказе */
+.order-calculator-data {
+    background: #e3f2fd;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    border-left: 4px solid #2196f3;
+}
+
+.order-calculator-data h4 {
+    margin-top: 0;
+    color: #1976d2;
+}
+
+.order-calculator-data p {
+    margin: 5px 0;
+}
+
+/* Информация о доставке */
+.order-delivery-info {
+    background: #fff3e0;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    border-left: 4px solid #ff9800;
+}
+
+.order-delivery-info h4 {
+    margin-top: 0;
+    color: #f57c00;
+}
+
+/* ============================================================================
+   УВЕДОМЛЕНИЯ
+   ============================================================================ */
+
+.notice.parusweb-notice {
+    border-left-color: #3aa655;
+}
+
+.notice.parusweb-notice p {
+    font-size: 14px;
+}
+
+.notice.parusweb-notice ul {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.notice.parusweb-notice li {
+    margin: 5px 0;
+}
+
+/* ============================================================================
+   НАСТРОЙКИ API
+   ============================================================================ */
+
+.inn-api-settings-page .form-table th {
+    width: 200px;
+    font-weight: 600;
+}
+
+.inn-api-settings-page .description {
+    color: #666;
+    font-style: italic;
+}
+
+.inn-api-test-section {
+    background: #f0f0f1;
+    padding: 20px;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+.inn-api-test-section h2 {
+    margin-top: 0;
+}
+
+#test_inn {
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+
+#test_result {
+    background: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #c3c4c7;
+}
+
+/* ============================================================================
+   АДАПТИВНОСТЬ
+   ============================================================================ */
+
+@media screen and (max-width: 782px) {
+    .parusweb-modules-page .wp-list-table th,
+    .parusweb-modules-page .wp-list-table td {
+        padding: 8px;
+        font-size: 13px;
+    }
+    
+    .dependency-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+    
+    .parusweb-info {
+        padding: 15px;
+    }
+    
+    .category-pricing-settings input[type="number"],
+    .category-pricing-settings input[type="text"] {
+        max-width: 100%;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .parusweb-modules-page .card h2,
+    .parusweb-modules-page .card h3 {
+        font-size: 14px;
+        padding: 12px 15px;
+    }
+    
+    .parusweb-modules-page .wp-list-table {
+        font-size: 12px;
+    }
+    
+    .status-loaded::before,
+    .status-pending::before,
+    .status-error::before,
+    .status-disabled::before {
+        content: "";
+    }
+}
+
+/* ============================================================================
+   ДОПОЛНИТЕЛЬНЫЕ УТИЛИТЫ
+   ============================================================================ */
+
+.parusweb-helper-text {
+    color: #666;
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 5px;
+}
+
+.parusweb-required {
+    color: #dc3232;
+    font-weight: bold;
+}
+
+.parusweb-success {
+    color: #46b450;
+}
+
+.parusweb-warning {
+    color: #f0b849;
+}
+
+.parusweb-error {
+    color: #dc3232;
+}
+
+.parusweb-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.parusweb-badge-success {
+    background: #46b450;
+    color: #fff;
+}
+
+.parusweb-badge-warning {
+    background: #f0b849;
+    color: #333;
+}
+
+.parusweb-badge-error {
+    background: #dc3232;
+    color: #fff;
+}
+
+.parusweb-badge-info {
+    background: #2196f3;
+    color: #fff;
+}
