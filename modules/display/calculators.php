@@ -319,7 +319,7 @@ function createPaintingServicesBlock(currentCategoryId) {
         resultBlock.appendChild(areaCalc);
 
         // Добавляем блок услуг покраски после блока расчета площади
-        if (paintingBlock) {
+        if (typeof paintingBlock !== 'undefined' && paintingBlock) {
             areaCalc.appendChild(paintingBlock);
         }
 
@@ -701,7 +701,7 @@ multiplierCalc.innerHTML = calcHTML;
 resultBlock.appendChild(multiplierCalc);
 
 // Добавляем блок услуг покраски после калькулятора с множителем
-if (paintingBlock) {
+if (typeof paintingBlock !== 'undefined' && paintingBlock) {
     multiplierCalc.appendChild(paintingBlock);
 }
 <?php
@@ -941,7 +941,7 @@ function updatePaintingServiceCost(totalArea = null) {
 }
 
 // Обработчик для услуг покраски (select)
-if (paintingBlock) {
+if (typeof paintingBlock !== 'undefined' && paintingBlock) {
     const serviceSelect = document.getElementById('painting_service_select');
     if (serviceSelect) {
         serviceSelect.addEventListener('change', function() {
@@ -1214,7 +1214,7 @@ resultBlock.appendChild(runningMeterCalc);
 console.log('✓ Калькулятор погонных метров');
 
 // Добавляем блок услуг покраски
-if (paintingBlock) {
+if (typeof paintingBlock !== 'undefined' && paintingBlock) {
     runningMeterCalc.appendChild(paintingBlock);
     console.log('✓ Подключение покраски');
 }
@@ -1353,23 +1353,46 @@ document.addEventListener('click', function(e) {
 });
 
 // Эффекты наведения
-document.querySelectorAll('.shape-tile').forEach(tile => {
-    tile.addEventListener('mouseenter', function() {
-        const radio = this.querySelector('input[name="falsebalk_shape"]');
-        if (!radio || !radio.checked) {
-            this.style.borderColor = '#0073aa';
-            this.style.transform = 'scale(1.02)';
-        }
-    });
-    
-    tile.addEventListener('mouseleave', function() {
-        const radio = this.querySelector('input[name="falsebalk_shape"]');
-        if (!radio || !radio.checked) {
-            this.style.borderColor = '#ccc';
-            this.style.transform = 'scale(1)';
-        }
-    });
-});
+setTimeout(function() {
+        document.querySelectorAll('.shape-tile').forEach(tile => {
+            tile.addEventListener('click', function() {
+                const radio = this.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.checked = true;
+                }
+                
+                document.querySelectorAll('.shape-tile').forEach(t => {
+                    t.style.borderColor = '#ccc';
+                    t.style.transform = 'scale(1)';
+                });
+                
+                this.style.borderColor = '#2c5cc5';
+                this.style.transform = 'scale(1.05)';
+                
+                if (radio) {
+                    const shapeValue = radio.value;
+                    updateDimensions(shapeValue);
+                    updateRunningMeterCalc();
+                }
+            });
+            
+            tile.addEventListener('mouseenter', function() {
+                const radio = this.querySelector('input[name="falsebalk_shape"]');
+                if (!radio || !radio.checked) {
+                    this.style.borderColor = '#2c5cc5';
+                    this.style.transform = 'scale(1.02)';
+                }
+            });
+            
+            tile.addEventListener('mouseleave', function() {
+                const radio = this.querySelector('input[name="falsebalk_shape"]');
+                if (!radio || !radio.checked) {
+                    this.style.borderColor = '#ccc';
+                    this.style.transform = 'scale(1)';
+                }
+            });
+        });
+    }, 100);
 
 console.log('✓ Falsebalk event handlers attached');
 
@@ -1607,7 +1630,7 @@ if (calcSettings && calcSettings.length_min > 0 && calcSettings.length_max > 0) 
         resultBlock.appendChild(sqMeterCalc);
 
         // Добавляем блок услуг покраски
-        if (paintingBlock) {
+        if (typeof paintingBlock !== 'undefined' && paintingBlock) {
             sqMeterCalc.appendChild(paintingBlock);
         }
 
