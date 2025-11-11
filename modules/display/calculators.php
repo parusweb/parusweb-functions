@@ -15,7 +15,12 @@
  * 
  * @package ParusWeb_Functions
  * @subpackage Display
- * @version 2.0.0
+ * @version 2.0.1
+ * 
+ * ИСПРАВЛЕНИЯ v2.0.1:
+ * - Исправлено отображение выбора сечения для фальшбалок
+ * - Исправлена работа выбора формы верха для штакетника (влияние на цену)
+ * - Перенесена фраза "Форма верхнего спила" выше иконок для штакетника
  */
 
 if (!defined('ABSPATH')) exit;
@@ -114,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 const resultBlock = document.createElement('div');
 resultBlock.id = 'custom-calc-block';
-resultBlock.className = 'calc-result-container'; // ВАЖНО: Добавляем класс для поиска позже
+resultBlock.className = 'calc-result-container';
 resultBlock.style.marginTop = '20px';
 resultBlock.style.marginBottom = '20px';
 form.insertAdjacentElement('afterend', resultBlock);
@@ -135,13 +140,14 @@ if (productCatIds.includes(273)) {
 
     const shapeBlock = document.createElement('div');
     shapeBlock.id = 'shtaketnik-shape-icons';
-    shapeBlock.style.display = 'flex';
-    shapeBlock.style.gap = '10px';
     shapeBlock.style.marginTop = '15px';
+    
+    // ИСПРАВЛЕНИЕ: Фраза выше иконок
     shapeBlock.innerHTML = `
-    <p>Форма верхнего спила:</p><br>
+    <p style="margin-bottom: 10px; font-weight: 600;">Форма верхнего спила:</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <label class="shape-option">
-            <input type="radio" name="shape_type" value="round" style="display:none">
+            <input type="radio" name="shape_type" value="round" checked style="display:none">
             <svg width="60" height="60" viewBox="0 0 100 100">
                 <path d="M0,50 A50,50 0 0,1 100,50 L100,100 L0,100 Z" fill="#8bc34a"/>
             </svg>
@@ -161,10 +167,15 @@ if (productCatIds.includes(273)) {
             </svg>
             <div style="font-size:11px">Прямой спил</div>
         </label>
+    </div>
     `;
     resultBlock.appendChild(shapeBlock);
 
     const shapeInputs = shapeBlock.querySelectorAll('input[name="shape_type"]');
+    
+    // ИСПРАВЛЕНИЕ: Устанавливаем активный класс для первого элемента
+    shapeInputs[0].closest('label').classList.add('active-shape');
+    
     shapeInputs.forEach(input => {
         const label = input.closest('label');
         label.addEventListener('click', () => {
@@ -176,26 +187,12 @@ if (productCatIds.includes(273)) {
             createHiddenField('selected_shape_type', selectedShape);
             createHiddenField('selected_shape_price', shapePrices[selectedShape]);
 
-            // вызов пересчета общей цены
-            if (typeof updateMultiplierCalc === 'function') updateMultiplierCalc();
+            // ИСПРАВЛЕНИЕ: вызов пересчета общей цены
+            if (typeof updateMultiplierCalc === 'function') {
+                updateMultiplierCalc();
+            }
         });
     });
-
-    // --- Добавляем в пересчет цену верхушки ---
-    const originalUpdate = window.updateMultiplierCalc;
-    window.updateMultiplierCalc = function() {
-        if (typeof originalUpdate === 'function') originalUpdate();
-
-        // если есть блок с результатом
-        const totalEl = document.getElementById('shtaketnik-total');
-        if (!totalEl) return;
-
-        const currentTotal = parseFloat(totalEl.textContent) || 0;
-        const add = parseFloat(shapePrices[selectedShape]) || 0;
-        const newTotal = currentTotal + add;
-
-        totalEl.textContent = Math.round(newTotal);
-    };
 
     // Стили
     const style = document.createElement('style');
@@ -541,97 +538,9 @@ if (calcSettings && calcSettings.length_min > 0 && calcSettings.length_max > 0) 
     </label>`;
 }
 
-// Количество — НЕ вводимое поле. Используем главное поле WC. Показываем текущее значение.
 calcHTML += `<label style="display:none">Количество (шт): <span id="mult_quantity_display" style="display:none">1</span></label>`;
 
 calcHTML += '</div>';
-
-// --- Блок выбора формы верха для Штакетника ---
-const shapeBlock = document.createElement('div');
-shapeBlock.id = 'shtaketnik-shape-icons';
-shapeBlock.style.display = 'flex';
-shapeBlock.style.gap = '10px';
-shapeBlock.style.marginTop = '15px';
-
-// Определяем SVG-иконки
-const shapeSVGs = {
-    round: `<svg width="50" height="50" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#0073aa"/></svg>`,
-    triangle: `<svg width="50" height="50" viewBox="0 0 100 100"><polygon points="50,0 100,100 0,100" fill="#0073aa"/></svg>`,
-    flat: `<svg width="50" height="50" viewBox="0 0 100 100"><rect width="100" height="100" fill="#0073aa"/></svg>`
-};
-
-// Создаем элементы формы
-['round','triangle','flat'].forEach(shape => {
-    const label = document.createElement('label');
-    label.className = 'shape-option';
-    label.style.cursor = 'pointer';
-    label.style.textAlign = 'center';
-    label.style.padding = '5px';
-    label.style.border = '2px solid #ddd';
-    label.style.borderRadius = '8px';
-    label.style.transition = 'all 0.3s';
-    
-    const input = document.createElement('input');
-    input.type = 'radio';
-    input.name = 'shape_type';
-    input.value = shape;
-    input.style.display = 'none';
-    
-    const divSVG = document.createElement('div');
-    divSVG.innerHTML = shapeSVGs[shape];
-    
-    const divName = document.createElement('div');
-    divName.textContent = shape === 'round' ? 'Полукруг' : shape === 'triangle' ? 'Треугольник' : 'Прямой спил';
-    divName.style.fontSize = '11px';
-    
-    label.appendChild(input);
-    label.appendChild(divSVG);
-    label.appendChild(divName);
-    shapeBlock.appendChild(label);
-});
-
-// Вставляем блок после мультипликаторного калькулятора
-multiplierCalc.appendChild(shapeBlock);
-
-// Добавляем стили для выбранной формы
-const style = document.createElement('style');
-style.textContent = `
-#shtaketnik-shape-icons input:checked + div { border-color:#0073aa; box-shadow:0 0 5px #0073aa; }
-#shtaketnik-shape-icons label:hover { transform: scale(1.05); }
-`;
-document.head.appendChild(style);
-
-// --- JS логика пересчета ---
-const shapeInputs = shapeBlock.querySelectorAll('input[name="shape_type"]');
-shapeInputs.forEach(input => {
-    input.addEventListener('change', () => {
-        // цена формы в рублях
-        const shapePrices = {
-            round: parseFloat(<?php echo get_post_meta($product->get_id(), '_shape_price_round', true) ?: 0; ?>),
-            triangle: parseFloat(<?php echo get_post_meta($product->get_id(), '_shape_price_triangle', true) ?: 0; ?>),
-            flat: parseFloat(<?php echo get_post_meta($product->get_id(), '_shape_price_flat', true) ?: 0; ?>)
-        };
-        const selectedShape = input.value;
-        const extraPrice = shapePrices[selectedShape] || 0;
-
-        // обновляем результат мультипликатора
-        updateMultiplierCalc();
-
-        // добавляем стоимость формы к уже рассчитанной
-        const hiddenField = createHiddenField('selected_shape_price', extraPrice.toFixed(2));
-        createHiddenField('selected_shape_type', selectedShape);
-        
-        // обновляем отображение
-        const prevHTML = multResult.innerHTML;
-        multResult.innerHTML = prevHTML + `<br>Цена выбранной формы: <b>${extraPrice.toFixed(2)} ₽</b>`;
-    });
-});
-
-
-
-
-
-
 
 <?php if ($show_faska && !empty($faska_types)): ?>
 // Добавляем выбор фаски
@@ -643,7 +552,7 @@ calcHTML += `<div id="faska_selection" style="margin-top: 10px; display: none;">
         <label class="faska-option" style="cursor: pointer; text-align: center; padding: 8px; border: 2px solid #ddd; border-radius: 8px; transition: all 0.3s; aspect-ratio: 1;">
             <input type="radio" name="faska_type" value="<?php echo esc_attr($faska['name']); ?>" data-index="<?php echo $index; ?>" data-image="<?php echo esc_url($faska['image']); ?>" style="display: none;">
             <?php if (!empty($faska['image'])): ?>
-            <img src="<?php echo esc_url($faska['image']); ?>" alt="<?php echo esc_attr($faska['name']); ?>" style="width: 100%; height: 60px; object-fit: contain; margin-bottom: 3px;">
+            <img src="<?php echo esc_url($faska['image']); ?>" alt="<?php echo esc_attr($faska['name']); ?>" style="width: 100%; object-fit: contain; margin-bottom: 3px;">
             <?php endif; ?>
             <div style="font-size: 11px; line-height: 1.2;"><?php echo esc_html($faska['name']); ?></div>
         </label>
@@ -764,21 +673,22 @@ function updateMultiplierCalc() {
     // стоимость покраски (если выбрана)
     const paintingCost = updatePaintingServiceCost(totalArea);
 
-    // --- учитывать цену выбранной формы верхушки ---
+    // ИСПРАВЛЕНИЕ: учитывать цену выбранной формы верхушки штакетника
     let shapeExtraTotal = 0;
-    let shapeExtraPerItem = 0;
     const selectedShapeInput = document.querySelector('input[name="shape_type"]:checked');
     if (selectedShapeInput) {
         const shapeKey = selectedShapeInput.value;
-        // shapePrices определён в блоке создания и доступен в scope
-        const unitShapePrice = parseFloat((typeof shapePrices !== 'undefined' && shapePrices[shapeKey]) ? shapePrices[shapeKey] : 0) || 0;
-        // логика: цена верхушки привязана к длине (м) как в отдельном калькуляторе: price = length_m * unitPrice * multiplier
-        shapeExtraPerItem = unitShapePrice;
-        shapeExtraTotal = shapeExtraPerItem * quantity;
+        const shapePricesLocal = {
+            round: <?php echo floatval(get_post_meta($product->get_id(), '_shape_price_round', true) ?: 0); ?>,
+            triangle: <?php echo floatval(get_post_meta($product->get_id(), '_shape_price_triangle', true) ?: 0); ?>,
+            flat: <?php echo floatval(get_post_meta($product->get_id(), '_shape_price_flat', true) ?: 0); ?>
+        };
+        const shapePrice = parseFloat(shapePricesLocal[shapeKey]) || 0;
+        shapeExtraTotal = shapePrice * quantity;
 
         // сохраняем в скрытых полях для отправки в корзину
         createHiddenField('selected_shape_type', shapeKey);
-        createHiddenField('selected_shape_price_per_item', shapeExtraPerItem.toFixed(2));
+        createHiddenField('selected_shape_price_per_item', shapePrice.toFixed(2));
         createHiddenField('selected_shape_price_total', shapeExtraTotal.toFixed(2));
     } else {
         // убираем поля если ничего не выбрано
@@ -792,7 +702,7 @@ function updateMultiplierCalc() {
 
     let html = `Площадь 1 шт: <b>${areaPerItem.toFixed(3)} м²</b><br>`;
     html += `Общая площадь: <b>${totalArea.toFixed(3)} м²</b> (${quantity} шт)<br>`;
-if (showThickness) { html += `Толщина: <b>40мм</b><br>`; }
+    if (showThickness) { html += `Толщина: <b>40мм</b><br>`; }
     html += `Цена за 1 шт: <b>${pricePerItem.toFixed(2)} ₽</b><br>`;
     html += `<br>`;
     html += `Стоимость материала: <b>${materialPrice.toFixed(2)} ₽</b><br>`;
@@ -890,7 +800,6 @@ if (quantityInput) {
         if (!isAutoUpdate) {
             const mainQty = parseInt(this.value);
             if (mainQty > 0 && multWidthEl.value && multLengthEl.value) {
-                multQuantityEl.value = mainQty;
                 updateMultiplierCalc();
             }
         }
@@ -982,7 +891,7 @@ if (typeof paintingBlock !== 'undefined' && paintingBlock) {
             const rmLengthEl = document.getElementById('rm_length');
             if (rmLengthEl && rmLengthEl.value) {
                 updateRunningMeterCalc();
-                return; // ВАЖНО: возвращаем return, чтобы не сбросить покраску
+                return;
             }
 
             // Сценарий 4: ничего не введено, но есть pack_area
@@ -1074,6 +983,7 @@ document.addEventListener('change', function(e) {
     // ТОЛЬКО для фальшбалок очищаем resultBlock
     <?php if ($show_falsebalk_calculator): ?>
         console.log('Clearing result block for FALSEBALK calculator');
+        const resultBlock = document.getElementById('custom-calc-block');
         if (resultBlock) {
             resultBlock.innerHTML = '';
         }
@@ -1129,7 +1039,7 @@ foreach ($shapes_data as $shape_key => $shape_info):
 endforeach;
 ?>
 
-// 1. ВЫБОР ФОРМЫ СЕЧЕНИЯ
+// ИСПРАВЛЕНИЕ: 1. ВЫБОР ФОРМЫ СЕЧЕНИЯ с корректным добавлением в DOM
 rmCalcHTML += '<div style="margin-bottom:20px; border:2px solid #e0e0e0; padding:15px; border-radius:8px; background:#f9f9f9;">';
 rmCalcHTML += '<label style="display:block; margin-bottom:15px; font-weight:600; font-size:1.1em;">Шаг 1: Выберите форму сечения фальшбалки</label>';
 rmCalcHTML += '<div style="display:flex; gap:15px; flex-wrap:wrap;">';
@@ -1148,7 +1058,7 @@ rmCalcHTML += `<label style="display:flex; flex-direction:column; gap:5px;">
     </select>
 </label>`;
 
-rmCalcHTML += `<div id="height_container" style="dislpay:contents"></div>`;
+rmCalcHTML += `<div id="height_container" style="display:contents"></div>`;
 
 rmCalcHTML += `<label style="display:flex; flex-direction:column; gap:5px;">
     <span style="font-weight:500;">Длина (м):</span>
@@ -1210,191 +1120,179 @@ rmCalcHTML += '<div id="calc_rm_result" style="margin-top:10px;"></div>';
 
 // ВАЖНО: Добавляем HTML в DOM
 runningMeterCalc.innerHTML = rmCalcHTML;
-resultBlock.appendChild(runningMeterCalc);
-console.log('✓ Калькулятор погонных метров');
+const resultBlock = document.getElementById('custom-calc-block');
+if (resultBlock) {
+    resultBlock.appendChild(runningMeterCalc);
+} else {
+    console.error('resultBlock not found!');
+}
 
 // Добавляем блок услуг покраски
 if (typeof paintingBlock !== 'undefined' && paintingBlock) {
     runningMeterCalc.appendChild(paintingBlock);
-    console.log('✓ Подключение покраски');
+    console.log('✓ Painting services block added');
 }
 
 <?php if ($show_falsebalk_calculator): ?>
 // ============ JAVASCRIPT ЛОГИКА ДЛЯ ФАЛЬШБАЛОК ============
-
-// === ФУНКЦИИ ===
-function generateOptions(min, max, step, unit = '') {
-    const options = ['<option value="">Выберите...</option>'];
-    if (!min || !max || !step || min > max) return options.join('');
-    const stepsCount = Math.round((max - min) / step) + 1;
-    for (let i = 0; i < stepsCount; i++) {
-        const value = min + (i * step);
-        const displayValue = unit === 'м' ? value.toFixed(2) : Math.round(value);
-        const rawValue = unit === 'м' ? value.toFixed(2) : Math.round(value);
-        options.push(`<option value="${rawValue}">${displayValue}${unit ? ' ' + unit : ''}</option>`);
-    }
-    return options.join('');
-}
-
-function parseOldFormat(data) {
-    if (typeof data === 'string' && data.includes(',')) {
-        const values = data.split(',').map(v => v.trim()).filter(v => v);
-        return values.map(v => `<option value="${v}">${v}</option>`).join('');
-    }
-    return null;
-}
-
-const falsebalkaParams = document.getElementById('falsebalk_params');
-const rmWidthEl = document.getElementById('rm_width');
-const heightContainer = document.getElementById('height_container');
-const rmLengthEl = document.getElementById('rm_length');
-
-function updateDimensions(selectedShape) {
-    const shapeData = shapesData[selectedShape];
-    console.log('Updating dimensions for:', selectedShape, shapeData);
+// ИСПРАВЛЕНИЕ: Ждем, пока элементы добавятся в DOM перед навешиванием обработчиков
+setTimeout(function() {
+    console.log('=== Attaching falsebalk event handlers ===');
     
-    if (!shapeData || !shapeData.enabled) {
-        console.error('No data found for shape:', selectedShape);
-        return;
+    // === ФУНКЦИИ ===
+    function generateOptions(min, max, step, unit = '') {
+        const options = ['<option value="">Выберите...</option>'];
+        if (!min || !max || !step || min > max) return options.join('');
+        const stepsCount = Math.round((max - min) / step) + 1;
+        for (let i = 0; i < stepsCount; i++) {
+            const value = min + (i * step);
+            const displayValue = unit === 'м' ? value.toFixed(2) : Math.round(value);
+            const rawValue = unit === 'м' ? value.toFixed(2) : Math.round(value);
+            options.push(`<option value="${rawValue}">${displayValue}${unit ? ' ' + unit : ''}</option>`);
+        }
+        return options.join('');
     }
-    
-    falsebalkaParams.style.display = 'block';
-    
-    // ШИРИНЫ
-    const oldWidthFormat = parseOldFormat(shapeData.widths);
-    if (oldWidthFormat) {
-        rmWidthEl.innerHTML = '<option value="">Выберите...</option>' + oldWidthFormat;
-    } else {
-        rmWidthEl.innerHTML = generateOptions(shapeData.width_min, shapeData.width_max, shapeData.width_step, 'мм');
+
+    function parseOldFormat(data) {
+        if (typeof data === 'string' && data.includes(',')) {
+            const values = data.split(',').map(v => v.trim()).filter(v => v);
+            return values.map(v => `<option value="${v}">${v}</option>`).join('');
+        }
+        return null;
     }
-    
-    // ВЫСОТЫ
-    heightContainer.innerHTML = '';
-    if (selectedShape === 'p') {
-        // П-образная: две высоты
-        let height1Options, height2Options;
-        const oldHeight1Format = parseOldFormat(shapeData.heights);
+
+    const falsebalkaParams = document.getElementById('falsebalk_params');
+    const rmWidthEl = document.getElementById('rm_width');
+    const heightContainer = document.getElementById('height_container');
+    const rmLengthEl = document.getElementById('rm_length');
+
+    function updateDimensions(selectedShape) {
+        const shapeData = shapesData[selectedShape];
+        console.log('Updating dimensions for:', selectedShape, shapeData);
         
-        if (oldHeight1Format) {
-            height1Options = '<option value="">Выберите...</option>' + oldHeight1Format;
-            height2Options = '<option value="">Выберите...</option>' + oldHeight1Format;
-        } else {
-            height1Options = generateOptions(shapeData.height1_min, shapeData.height1_max, shapeData.height1_step, 'мм');
-            height2Options = generateOptions(shapeData.height2_min, shapeData.height2_max, shapeData.height2_step, 'мм');
+        if (!shapeData || !shapeData.enabled) {
+            console.error('No data found for shape:', selectedShape);
+            return;
         }
         
-        heightContainer.innerHTML = `
-            <label style="display:flex; flex-direction:column; gap:5px;">
-                <span style="font-weight:500;">Высота 1 (мм):</span>
-                <select id="rm_height1" style="background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:4px; min-width:150px;">
-                    ${height1Options}
-                </select>
-            </label>
-            <label style="display:flex; flex-direction:column; gap:5px;">
-                <span style="font-weight:500;">Высота 2 (мм):</span>
-                <select id="rm_height2" style="background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:4px; min-width:150px;">
-                    ${height2Options}
-                </select>
-            </label>
-        `;
+        falsebalkaParams.style.display = 'block';
         
-        document.getElementById('rm_height1').addEventListener('change', updateRunningMeterCalc);
-        document.getElementById('rm_height2').addEventListener('change', updateRunningMeterCalc);
-    } else {
-        // Г и О: одна высота
-        const oldHeightFormat = parseOldFormat(shapeData.heights);
-        let heightOptions = oldHeightFormat ? '<option value="">Выберите...</option>' + oldHeightFormat : 
-                           generateOptions(shapeData.height_min, shapeData.height_max, shapeData.height_step, 'мм');
+        // ШИРИНЫ
+        const oldWidthFormat = parseOldFormat(shapeData.widths);
+        if (oldWidthFormat) {
+            rmWidthEl.innerHTML = '<option value="">Выберите...</option>' + oldWidthFormat;
+        } else {
+            rmWidthEl.innerHTML = generateOptions(shapeData.width_min, shapeData.width_max, shapeData.width_step, '');
+        }
         
-        heightContainer.innerHTML = `
-            <label style="display:flex; flex-direction:column; gap:5px;">
-                <span style="font-weight:500;">Высота (мм):</span>
-                <select id="rm_height" style="background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:4px; min-width:150px;">
-                    ${heightOptions}
-                </select>
-            </label>
-        `;
+        // ВЫСОТЫ
+        heightContainer.innerHTML = '';
+        if (selectedShape === 'p') {
+            // П-образная: две высоты
+            let height1Options, height2Options;
+            const oldHeight1Format = parseOldFormat(shapeData.heights);
+            
+            if (oldHeight1Format) {
+                height1Options = '<option value="">Выберите...</option>' + oldHeight1Format;
+                height2Options = '<option value="">Выберите...</option>' + oldHeight1Format;
+            } else {
+                height1Options = generateOptions(shapeData.height1_min, shapeData.height1_max, shapeData.height1_step, '');
+                height2Options = generateOptions(shapeData.height2_min, shapeData.height2_max, shapeData.height2_step, '');
+            }
+            
+            heightContainer.innerHTML = `
+                <label style="display:flex; flex-direction:column; gap:5px;">
+                    <span style="font-weight:500;">Высота 1 (мм):</span>
+                    <select id="rm_height1" style="background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:4px; min-width:150px;">
+                        ${height1Options}
+                    </select>
+                </label>
+                <label style="display:flex; flex-direction:column; gap:5px;">
+                    <span style="font-weight:500;">Высота 2 (мм):</span>
+                    <select id="rm_height2" style="background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:4px; min-width:150px;">
+                        ${height2Options}
+                    </select>
+                </label>
+            `;
+            
+            document.getElementById('rm_height1').addEventListener('change', updateRunningMeterCalc);
+            document.getElementById('rm_height2').addEventListener('change', updateRunningMeterCalc);
+        } else {
+            // Г и О: одна высота
+            const oldHeightFormat = parseOldFormat(shapeData.heights);
+            let heightOptions = oldHeightFormat ? '<option value="">Выберите...</option>' + oldHeightFormat : 
+                               generateOptions(shapeData.height_min, shapeData.height_max, shapeData.height_step, '');
+            
+            heightContainer.innerHTML = `
+                <label style="display:flex; flex-direction:column; gap:5px;">
+                    <span style="font-weight:500;">Высота (мм):</span>
+                    <select id="rm_height" style="background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:4px; min-width:150px;">
+                        ${heightOptions}
+                    </select>
+                </label>
+            `;
+            
+            document.getElementById('rm_height').addEventListener('change', updateRunningMeterCalc);
+        }
         
-        document.getElementById('rm_height').addEventListener('change', updateRunningMeterCalc);
+        // ДЛИНЫ
+        const oldLengthFormat = parseOldFormat(shapeData.lengths);
+        if (oldLengthFormat) {
+            rmLengthEl.innerHTML = '<option value="">Выберите...</option>' + oldLengthFormat;
+        } else {
+            rmLengthEl.innerHTML = generateOptions(shapeData.length_min, shapeData.length_max, shapeData.length_step, '');
+        }
+        
+        document.getElementById('calc_rm_result').innerHTML = '';
+        if (typeof removeHiddenFields === 'function') {
+            removeHiddenFields('custom_rm_');
+        }
     }
-    
-    // ДЛИНЫ
-    const oldLengthFormat = parseOldFormat(shapeData.lengths);
-    if (oldLengthFormat) {
-        rmLengthEl.innerHTML = '<option value="">Выберите...</option>' + oldLengthFormat;
-    } else {
-        rmLengthEl.innerHTML = generateOptions(shapeData.length_min, shapeData.length_max, shapeData.length_step, 'м');
-    }
-    
-    document.getElementById('calc_rm_result').innerHTML = '';
-    if (typeof removeHiddenFields === 'function') {
-        removeHiddenFields('custom_rm_');
-    }
-}
 
-// Обработчик клика по плиткам
-document.addEventListener('click', function(e) {
-    const tile = e.target.closest('.shape-tile');
-    if (!tile) return;
-    
-    document.querySelectorAll('.shape-tile').forEach(t => {
-        t.style.borderColor = '#ccc';
-        t.style.boxShadow = 'none';
+    // Обработчик клика по плиткам
+    document.querySelectorAll('.shape-tile').forEach(tile => {
+        tile.addEventListener('click', function() {
+            console.log('Shape tile clicked:', this);
+            
+            // Снимаем выделение со всех плиток
+            document.querySelectorAll('.shape-tile').forEach(t => {
+                t.style.borderColor = '#ccc';
+                t.style.boxShadow = 'none';
+            });
+            
+            // Выделяем выбранную плитку
+            this.style.borderColor = '#3aa655';
+            this.style.boxShadow = '0 0 0 3px rgba(58,166,85,0.3)';
+            
+            // Отмечаем radio
+            const radio = this.querySelector('input[name="falsebalk_shape"]');
+            if (radio) {
+                radio.checked = true;
+                console.log('Radio checked:', radio.value);
+                updateDimensions(radio.value);
+            }
+        });
+        
+        // Эффекты наведения
+        tile.addEventListener('mouseenter', function() {
+            const radio = this.querySelector('input[name="falsebalk_shape"]');
+            if (!radio || !radio.checked) {
+                this.style.borderColor = '#2c5cc5';
+                this.style.transform = 'scale(1.02)';
+            }
+        });
+        
+        tile.addEventListener('mouseleave', function() {
+            const radio = this.querySelector('input[name="falsebalk_shape"]');
+            if (!radio || !radio.checked) {
+                this.style.borderColor = '#ccc';
+                this.style.transform = 'scale(1)';
+            }
+        });
     });
     
-    tile.style.borderColor = '#3aa655';
-    tile.style.boxShadow = '0 0 0 3px rgba(58,166,85,0.3)';
-    
-    const radio = tile.querySelector('input[name="falsebalk_shape"]');
-    if (radio) {
-        radio.checked = true;
-        updateDimensions(radio.value);
-    }
-});
-
-// Эффекты наведения
-setTimeout(function() {
-        document.querySelectorAll('.shape-tile').forEach(tile => {
-            tile.addEventListener('click', function() {
-                const radio = this.querySelector('input[type="radio"]');
-                if (radio) {
-                    radio.checked = true;
-                }
-                
-                document.querySelectorAll('.shape-tile').forEach(t => {
-                    t.style.borderColor = '#ccc';
-                    t.style.transform = 'scale(1)';
-                });
-                
-                this.style.borderColor = '#2c5cc5';
-                this.style.transform = 'scale(1.05)';
-                
-                if (radio) {
-                    const shapeValue = radio.value;
-                    updateDimensions(shapeValue);
-                    updateRunningMeterCalc();
-                }
-            });
-            
-            tile.addEventListener('mouseenter', function() {
-                const radio = this.querySelector('input[name="falsebalk_shape"]');
-                if (!radio || !radio.checked) {
-                    this.style.borderColor = '#2c5cc5';
-                    this.style.transform = 'scale(1.02)';
-                }
-            });
-            
-            tile.addEventListener('mouseleave', function() {
-                const radio = this.querySelector('input[name="falsebalk_shape"]');
-                if (!radio || !radio.checked) {
-                    this.style.borderColor = '#ccc';
-                    this.style.transform = 'scale(1)';
-                }
-            });
-        });
-    }, 100);
-
-console.log('✓ Falsebalk event handlers attached');
+    console.log('✓ Falsebalk event handlers attached');
+}, 200); // Увеличили задержку до 200ms для надежности
 
 <?php else: ?>
 // ============ JAVASCRIPT ЛОГИКА ДЛЯ ОБЫЧНЫХ ИЗДЕЛИЙ ============
@@ -1446,47 +1344,34 @@ function updateRunningMeterCalc() {
         return;
     }
 
-// пересчёт длин и площади
-const totalLength = lengthValue * quantity;
+    const totalLength = lengthValue * quantity;
 
-// --- вычисляем площадь покраски (m^2) как раньше ---
-let paintingArea = 0;
-if (widthValue > 0) {
-    const width_m = widthValue / 1000;
-    const height_m = (typeof heightValue !== 'undefined' ? heightValue : 0) / 1000;
-    const height2_m = (typeof height2Value !== 'undefined' ? height2Value : 0) / 1000;
+    let paintingArea = 0;
+    if (widthValue > 0) {
+        const width_m = widthValue / 1000;
+        const height_m = (typeof heightValue !== 'undefined' ? heightValue : 0) / 1000;
+        const height2_m = (typeof height2Value !== 'undefined' ? height2Value : 0) / 1000;
 
-    if (selectedShape) {
+        <?php if ($show_falsebalk_calculator): ?>
         const shapeKey = selectedShape.value;
         if (shapeKey === 'g') {
             paintingArea = (width_m + height_m) * totalLength;
         } else if (shapeKey === 'p') {
             paintingArea = (width_m + height_m + height2_m) * totalLength;
         } else if (shapeKey === 'o') {
-            // О-образная — две стороны и две высоты (эквивалент 4 плоскостей)
             paintingArea = 2 * (width_m + height_m) * totalLength;
         } else {
-            // запасной вариант
             paintingArea = width_m * totalLength;
         }
-    } else {
+        <?php else: ?>
         paintingArea = width_m * totalLength;
+        <?php endif; ?>
     }
-}
 
-// --- материал берём пропорционально той же площади ---
-// basePriceRM трактуем как цена за 1 м² материала/покрытия
-const materialPrice = paintingArea * basePriceRM * priceMultiplier;
-
-// цена за одну единицу (на случай вывода)
-const pricePerItem = (quantity > 0) ? (materialPrice / quantity) : 0;
-
-// рассчёт стоимости покраски 
-const paintingCost = updatePaintingServiceCost(paintingArea);
-
-// итог
-const grandTotal = materialPrice + paintingCost;
-
+    const materialPrice = paintingArea * basePriceRM * priceMultiplier;
+    const pricePerItem = (quantity > 0) ? (materialPrice / quantity) : 0;
+    const paintingCost = updatePaintingServiceCost(paintingArea);
+    const grandTotal = materialPrice + paintingCost;
 
     <?php if ($show_falsebalk_calculator): ?>
     const shapeLabel = selectedShape.closest('.shape-tile')?.querySelector('span')?.textContent.trim() || selectedShape.value;
@@ -1588,41 +1473,30 @@ console.log('✓ Running meter calculator fully initialized');
             </label>`;
         }
 
+        // Поле длины
+        if (calcSettings && calcSettings.length_min > 0 && calcSettings.length_max > 0) {
+            sqCalcHTML += `<label>Длина (м): 
+                <select id="sq_length" style="background:#fff;margin-left:10px;">
+                    <option value="">Выберите...</option>`;
+            
+            const lengthMin = calcSettings.length_min;
+            const lengthMax = calcSettings.length_max;
+            const lengthStep = calcSettings.length_step;
+            const stepsCount = Math.round((lengthMax - lengthMin) / lengthStep) + 1;
+            
+            for (let i = 0; i < stepsCount; i++) {
+                const value = lengthMin + (i * lengthStep);
+                const displayValue = value.toFixed(2);
+                sqCalcHTML += `<option value="${displayValue}">${displayValue}</option>`;
+            }
+            sqCalcHTML += `</select></label>`;
+        } else {
+            sqCalcHTML += `<label>Длина (м): 
+                <input type="number" id="sq_length" min="0.01" step="0.01" placeholder="2.0" style="width:100px; margin-left:10px;background:#fff">
+            </label>`;
+        }
 
-
-
-// Поле длины
-
-let calcHTML='';
-
-if (calcSettings && calcSettings.length_min > 0 && calcSettings.length_max > 0) {
-    calcHTML += `<label>Длина (м) 001: 
-        <select id="mult_length" min="0.01" step="0.01"  style="margin-left:10px;background:#fff;">
-            <option value="">Выберите...</option>`;
-    
-    // ВАЖНО: Используем целочисленный счётчик для избежания ошибок округления float
-    const lengthMin = calcSettings.length_min;
-    const lengthMax = calcSettings.length_max;
-    const lengthStep = calcSettings.length_step;
-    
-    // Вычисляем количество шагов
-    const stepsCount = Math.round((lengthMax - lengthMin) / lengthStep) + 1;
-    
-    for (let i = 0; i < stepsCount; i++) {
-        const value = lengthMin + (i * lengthStep);
-        // Округляем до 2 знаков после запятой для отображения
-        const displayValue = value.toFixed(2);
-        calcHTML += `<option value="${displayValue}">${displayValue}</option>`;
-    }
-    
-    calcHTML += `</select></label>`;
-} else {
-    calcHTML += `<label>Длина (м): 
-        <input type="number" id="mult_length" min="0.01" step="0.01" placeholder="0.01" style="width:100px; margin-left:10px;background:#fff">
-    </label>`;
-}
-
-        // Количество
+        sqCalcHTML += `<label style="display:none">Количество (шт): <span id="sq_quantity_display" style="margin-left:10px; font-weight:600;">1</span></label>`;
         sqCalcHTML += '</div><div id="calc_sq_result" style="margin-top:10px; font-size:1.3em"></div>';
         sqMeterCalc.innerHTML = sqCalcHTML;
         
