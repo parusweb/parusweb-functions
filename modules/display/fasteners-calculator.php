@@ -98,7 +98,39 @@ function pw_get_category_fasteners_data($product_id) {
     $product = wc_get_product($product_id);
     if (!$product) return null;
 
-    foreach ($product->get_category_ids() as $cat_id) {
+    $category_ids = $product->get_category_ids();
+    
+    // СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ТЕРМОДРЕВЕСИНЫ (категория 92)
+    if (in_array(92, $category_ids)) {
+        $product_name = strtolower($product->get_name());
+        $target_category = null;
+        
+        // Определяем подкатегорию по названию товара
+        if (stripos($product_name, 'вагонка') !== false) {
+            $target_category = 88; // Вагонка
+        } elseif (stripos($product_name, 'планкен') !== false) {
+            $target_category = 91; // Планкен
+        }
+        
+        // Если нашли подходящую категорию, получаем крепёж из неё
+        if ($target_category) {
+            $term_id = 'product_cat_' . $target_category;
+            if (get_field('enable_fasteners_calc', $term_id)) {
+                $type = get_field('fasteners_type', $term_id);
+                $products = get_field('fasteners_products', $term_id);
+                if (!empty($products)) {
+                    return array(
+                        'enabled' => true,
+                        'type' => $type,
+                        'products' => $products,
+                    );
+                }
+            }
+        }
+    }
+    
+    // СТАНДАРТНАЯ ОБРАБОТКА ДЛЯ ОСТАЛЬНЫХ КАТЕГОРИЙ
+    foreach ($category_ids as $cat_id) {
         $term_id = 'product_cat_' . $cat_id;
         if (get_field('enable_fasteners_calc', $term_id)) {
             $type = get_field('fasteners_type', $term_id);
