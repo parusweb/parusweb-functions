@@ -1,8 +1,7 @@
 <?php
 /**
  * Калькулятор крепежа для пиломатериалов с добавлением в корзину
- * Учитывает атрибуты товара shirina и dlina, вставляется в #calc-area (динамически),
- * передаёт в корзину рассчитанное количество упаковок.
+ * v2.2 - Добавлена логика определения крепежа по названию для термодревесины (ID 92)
  *
  * @package ParusWeb_Functions
  */
@@ -91,30 +90,62 @@ function pw_register_fasteners_category_fields() {
 }
 
 // ============================================================================
-// Получение данных крепежа для категории
+// НОВАЯ ФУНКЦИЯ: Определение категории крепежа по названию товара
+// ============================================================================
+
+/**
+ * Определяет ID категории для поиска крепежа на основе ключевых слов в названии товара
+ * Используется для термодревесины (категория 92)
+ * 
+ * @param string $product_title Название товара
+ * @return int|null ID категории для поиска крепежа или null если не определено
+ */
+function pw_detect_fastener_category_by_title($product_title) {
+    $title_lower = mb_strtolower($product_title, 'UTF-8');
+    
+    // Карта ключевых слов → ID категории
+    $keyword_map = array(
+        // Вагонка и евровагонка (предположим ID категории вагонки)
+        'вагонка' => array('category_id' => 87, 'keywords' => array('вагонка', 'евровагонка')),
+        
+        // Планкен (предположим ID категории планкена)
+        'планкен' => array('category_id' => 88, 'keywords' => array('планкен', 'планкен прямой', 'планкен скошенный')),
+        
+        // Террасная доска (предположим ID категории террасной доски)
+        'террасная' => array('category_id' => 89, 'keywords' => array('террасная', 'террасная доска', 'террас', 'евровельвет')),
+
+    );
+    
+    // Проверяем каждую группу ключевых слов
+    foreach ($keyword_map as $group_data) {
+        foreach ($group_data['keywords'] as $keyword) {
+            if (strpos($title_lower, $keyword) !== false) {
+                return $group_data['category_id'];
+            }
+        }
+    }
+    
+    return null;
+}
+
+// ============================================================================
+// ОБНОВЛЕННАЯ ФУНКЦИЯ: Получение данных крепежа с учетом определения по названию
 // ============================================================================
 
 function pw_get_category_fasteners_data($product_id) {
     $product = wc_get_product($product_id);
     if (!$product) return null;
 
-    $category_ids = $product->get_category_ids();
+    $product_categories = $product->get_category_ids();
     
-    // СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ТЕРМОДРЕВЕСИНЫ (категория 92)
-    if (in_array(92, $category_ids)) {
-        $product_name = strtolower($product->get_name());
-        $target_category = null;
+    // СПЕЦИАЛЬНАЯ ЛОГИКА ДЛЯ ТЕРМОДРЕВЕСИНЫ (ID 92)
+    if (in_array(92, $product_categories)) {
+        $product_title = $product->get_name();
+        $detected_category_id = pw_detect_fastener_category_by_title($product_title);
         
-        // Определяем подкатегорию по названию товара
-        if (stripos($product_name, 'вагонка') !== false) {
-            $target_category = 88; // Вагонка
-        } elseif (stripos($product_name, 'планкен') !== false) {
-            $target_category = 91; // Планкен
-        }
-        
-        // Если нашли подходящую категорию, получаем крепёж из неё
-        if ($target_category) {
-            $term_id = 'product_cat_' . $target_category;
+        if ($detected_category_id) {
+            // Получаем настройки крепежа из определенной категории
+            $term_id = 'product_cat_' . $detected_category_id;
             if (get_field('enable_fasteners_calc', $term_id)) {
                 $type = get_field('fasteners_type', $term_id);
                 $products = get_field('fasteners_products', $term_id);
@@ -123,14 +154,15 @@ function pw_get_category_fasteners_data($product_id) {
                         'enabled' => true,
                         'type' => $type,
                         'products' => $products,
+                        'detected_from' => $detected_category_id, // для отладки
                     );
                 }
             }
         }
     }
     
-    // СТАНДАРТНАЯ ОБРАБОТКА ДЛЯ ОСТАЛЬНЫХ КАТЕГОРИЙ
-    foreach ($category_ids as $cat_id) {
+    // ОБЫЧНАЯ ЛОГИКА для всех остальных категорий
+    foreach ($product_categories as $cat_id) {
         $term_id = 'product_cat_' . $cat_id;
         if (get_field('enable_fasteners_calc', $term_id)) {
             $type = get_field('fasteners_type', $term_id);
@@ -164,10 +196,24 @@ function pw_output_fasteners_calculator() {
         $f_id = is_array($fastener) && isset($fastener['product']) ? $fastener['product'] : intval($fastener);
         $f = wc_get_product($f_id);
         if ($f) {
+            // Получаем изображение товара
+            $image_id = $f->get_image_id();
+            $image_url = $image_id ? wp_get_attachment_image_url($image_id, 'medium') : wc_placeholder_img_src('medium');
+            
+            // Получаем краткое описание (первые 150 символов)
+            $description = $f->get_short_description();
+            if (empty($description)) {
+                $description = $f->get_description();
+            }
+            $description = wp_trim_words($description, 25, '...');
+            
             $fasteners_products[] = array(
-                'id'    => $f->get_id(),
-                'name'  => $f->get_name(),
-                'price' => floatval($f->get_price()),
+                'id'          => $f->get_id(),
+                'name'        => $f->get_name(),
+                'price'       => floatval($f->get_price()),
+                'image'       => $image_url,
+                'description' => $description,
+                'permalink'   => $f->get_permalink(),
             );
         }
     }
@@ -199,6 +245,35 @@ function pw_output_fasteners_calculator() {
     }
 
     ?>
+    <!-- Модальное окно для описания крепежа -->
+    <div id="fastener-modal" style="display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.6);">
+        <div style="position:relative; background-color:#fff; margin:5% auto; padding:0; width:90%; max-width:600px; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.3); animation:modalSlideIn 0.3s;">
+            <div style="padding:20px 25px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; border-radius:10px 10px 0 0;">
+                <h3 style="margin:0; font-size:1.3em;">О крепеже</h3>
+                <button type="button" id="fastener-modal-close" style="background:none; border:none; font-size:28px; font-weight:bold; color:#999; cursor:pointer; padding:0; width:30px; height:30px; display:flex; align-items:center; justify-content:center; transition:color 0.2s;" onmouseover="this.style.color='#333'" onmouseout="this.style.color='#999'">&times;</button>
+            </div>
+            <div id="fastener-modal-content" style="padding:25px;">
+                <!-- Контент загружается динамически -->
+            </div>
+        </div>
+    </div>
+
+    <style>
+    @keyframes modalSlideIn {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    #fastener-modal-close:hover {
+        transform: scale(1.1);
+    }
+    </style>
+
     <script type="text/javascript">
     (function(){
         const fastenersData = <?php echo json_encode($fasteners_products); ?>;
@@ -207,6 +282,13 @@ function pw_output_fasteners_calculator() {
         
         // Информация о том, что ширина взята из WC размеров (в сантиметрах)
         const widthIsFromWC = <?php echo json_encode($default_shirina !== null && floatval($product->get_attribute('shirina')) === 0 && $wc_width > 0 ? true : false); ?>;
+
+        <?php
+        // Для отладки - показываем откуда взяли крепеж
+        if (isset($fasteners_data['detected_from'])) {
+            echo "console.log('Крепеж определен по названию товара, используется категория ID: " . $fasteners_data['detected_from'] . "');\n";
+        }
+        ?>
 
         function parsePiecesPerPack(name) {
             // Ищем количество в разных форматах
@@ -262,6 +344,66 @@ function pw_output_fasteners_calculator() {
             displayName: limitWords(f.name, 5)
         }));
 
+        // ============================================================================
+        // МОДАЛЬНОЕ ОКНО
+        // ============================================================================
+
+        function openFastenerModal(fastenerId) {
+            const fastener = fastenersData.find(f => f.id === fastenerId);
+            if (!fastener) return;
+
+            const modal = document.getElementById('fastener-modal');
+            const content = document.getElementById('fastener-modal-content');
+
+            let html = '<div style="text-align:center; margin-bottom:20px;">';
+            html += '<img src="' + fastener.image + '" alt="' + fastener.name + '" style="max-width:100%; max-height:300px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">';
+            html += '</div>';
+            
+            html += '<h4 style="margin:0 0 15px 0; color:#333; font-size:1.2em;">' + fastener.name + '</h4>';
+            
+            if (fastener.description) {
+                html += '<div style="color:#666; line-height:1.6; margin-bottom:20px; font-size:0.95em;">' + fastener.description + '</div>';
+            }
+            
+            html += '<div style="background:#f8f9fa; padding:15px; border-radius:6px; margin-bottom:15px;">';
+            html += '<div style="display:flex; justify-content:space-between; align-items:center;">';
+            html += '<span style="color:#666; font-size:0.9em;">Цена за упаковку:</span>';
+            html += '<span style="color:#8bc34a; font-size:1.3em; font-weight:600;">' + fastener.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽</span>';
+            html += '</div>';
+            html += '</div>';
+            
+            html += '<a href="' + fastener.permalink + '" target="_blank" style="display:inline-block; padding:10px 20px; background:#8bc34a; color:#fff; text-decoration:none; border-radius:5px; transition:background 0.2s; font-weight:500;" onmouseover="this.style.background=\'#7cb342\'" onmouseout="this.style.background=\'#8bc34a\'">Подробнее о товаре →</a>';
+
+            content.innerHTML = html;
+            modal.style.display = 'block';
+        }
+
+        function closeFastenerModal() {
+            const modal = document.getElementById('fastener-modal');
+            modal.style.display = 'none';
+        }
+
+        // Обработчики закрытия модального окна
+        const modalCloseBtn = document.getElementById('fastener-modal-close');
+        if (modalCloseBtn) {
+            modalCloseBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeFastenerModal();
+            });
+        }
+        
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('fastener-modal');
+            if (event.target === modal) {
+                closeFastenerModal();
+            }
+        });
+
+        // ============================================================================
+        // ОСНОВНОЙ ФУНКЦИОНАЛ
+        // ============================================================================
+
         function tryToGetWidthMeters(raw) {
             if (raw === null || raw === undefined) return null;
             const n = parseFloat(raw);
@@ -307,6 +449,10 @@ function pw_output_fasteners_calculator() {
                 html += `<option value="${f.id}" data-price="${f.price}" data-piecesperpack="${f.piecesPerPack}">${safe}</option>`;
             });
             html += '</select>';
+            
+            // Кнопка "О крепеже" - БЕЗ иконки и с type="button"
+            html += '<button type="button" id="fastener_info_btn" style="display:none; width:100%; padding:10px; margin-bottom:10px; background:#8bc34a; color:#fff; border-radius:5px; cursor:pointer; font-weight:600; transition:all 0.2s;">О крепеже</button>';
+            
             html += '<div id="fastener_calculation_result" style="display:none; background:#fff; padding:10px; border-radius:5px; margin-bottom:8px;"></div>';
             
             block.innerHTML = html;
@@ -314,6 +460,20 @@ function pw_output_fasteners_calculator() {
 
             const select = block.querySelector('#fastener_select');
             const result = block.querySelector('#fastener_calculation_result');
+            const infoBtn = block.querySelector('#fastener_info_btn');
+
+            // Обработчик кнопки "О крепеже" - с preventDefault и stopPropagation
+            if (infoBtn) {
+                infoBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const selectedId = parseInt(select.value, 10);
+                    if (selectedId) {
+                        openFastenerModal(selectedId);
+                    }
+                    return false;
+                });
+            }
 
             function getFieldValue(id) {
                 const el = document.getElementById(id);
@@ -391,8 +551,13 @@ function pw_output_fasteners_calculator() {
             function updateCalculation() {
                 if (!select.value) {
                     result.style.display = 'none';
+                    infoBtn.style.display = 'none';
                     return;
                 }
+                
+                // Показываем кнопку "О крепеже" когда выбран крепеж
+                infoBtn.style.display = 'block';
+                
                 const opt = select.options[select.selectedIndex];
                 const price = parseFloat(opt.dataset.price || '0') || 0;
                 const piecesPerPack = parseInt(opt.dataset.piecesperpack || '100', 10) || 100;
@@ -412,16 +577,15 @@ function pw_output_fasteners_calculator() {
 
                 let widthMm = Math.round(widthMeters * 1000);
 
-// если значение явно больше 300 — делим на 10, пока не войдёт в диапазон
-while (widthMm > 300) {
-    widthMm = Math.round(widthMm / 10);
-}
+                // если значение явно больше 300 — делим на 10, пока не войдёт в диапазон
+                while (widthMm > 300) {
+                    widthMm = Math.round(widthMm / 10);
+                }
 
-// если меньше 80 — умножаем на 10, пока не войдёт в диапазон
-while (widthMm < 80) {
-    widthMm = Math.round(widthMm * 10);
-}
-
+                // если меньше 80 — умножаем на 10, пока не войдёт в диапазон
+                while (widthMm < 80) {
+                    widthMm = Math.round(widthMm * 10);
+                }
 
                 let perM2 = 30;
                 if (widthMm >= 85 && widthMm <= 90) perM2 = 30;
@@ -435,15 +599,12 @@ while (widthMm < 80) {
                 const neededPieces = Math.max(qtyByFormula, neededByPerM2);
 
                 const packsNeeded = Math.max(1, Math.ceil(neededPieces / piecesPerPack));
-                const totalPieces = packsNeeded * piecesPerPack;
                 const totalPrice = packsNeeded * price;
 
+                // УПРОЩЕННЫЙ ВЫВОД - только 3 строки
                 result.innerHTML = ''
                     + `<p>Площадь: <strong>${totalArea.toFixed(2)} м²</strong></p>`
-                    + `<p>Ширина: <strong>${widthMm} мм</strong></p>`
-                    + (lengthMeters ? `<p>Длина: <strong>${(lengthMeters>=1?lengthMeters.toFixed(3)+' м':(lengthMeters*1000).toFixed(0)+' мм')}</strong></p>` : '')
-                    + `<p>Потребуется крепежа: <strong>${neededPieces}</strong> шт.</p>`
-                    + `<p>Необходимо упаковок: <strong>${packsNeeded} уп.</strong> (${totalPieces} шт)</p>`
+                    + `<p>Необходимо упаковок: <strong>${packsNeeded} уп.</strong></p>`
                     + `<p>Стоимость крепежа: <strong>${totalPrice.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽</strong></p>`;
 
                 result.style.display = 'block';
@@ -497,47 +658,37 @@ while (widthMm < 80) {
 }
 
 // ============================================================================
-// ПЕРЕХВАТ ДОБАВЛЕНИЯ В КОРЗИНУ (ДО ОТПРАВКИ ФОРМЫ)
+// Остальной код без изменений
 // ============================================================================
 
 add_filter('woocommerce_add_to_cart_redirect', 'pw_capture_fastener_before_cart', 10, 2);
 function pw_capture_fastener_before_cart($url, $product_id) {
-    // Если это простой товар без вариаций, то при клике на кнопку вызывается 
-    // woocommerce_add_to_cart хук, и здесь мы уже слишком поздно
-    // Нам нужна обработка в самом начале процесса
     return $url;
 }
 
-// ВАРИАНТ 1: обработчик через wp_footer (перехватываем данные перед добавлением)
 add_action('wp_footer', 'pw_inject_fastener_handler', 999);
 function pw_inject_fastener_handler() {
     if (!is_product()) return;
     ?>
     <script type="text/javascript">
     (function(){
-        // Инициализируем глобальное состояние
         if (!window.pw_fastener_calculation) {
             window.pw_fastener_calculation = { fastener_id: 0, packs_needed: 0 };
         }
 
-        // Перехватываем кнопку добавления в корзину
         const addToCartBtn = document.querySelector('button[name="add-to-cart"], button.single_add_to_cart_button');
         if (!addToCartBtn) return;
 
-        // Оборачиваем обработчик клика
         addToCartBtn.addEventListener('click', function(e) {
             const form = document.querySelector('form.cart');
             if (!form) return;
 
-            // Если крепеж был рассчитан, добавляем скрытые поля в форму
             if (window.pw_fastener_calculation && window.pw_fastener_calculation.fastener_id > 0) {
                 const calc = window.pw_fastener_calculation;
 
-                // Удаляем старые скрытые поля если есть
                 const oldFields = form.querySelectorAll('input[name="fastener_select"], input[name="fastener_packs_needed"]');
                 oldFields.forEach(f => f.remove());
 
-                // Добавляем новые скрытые поля в форму
                 const input1 = document.createElement('input');
                 input1.type = 'hidden';
                 input1.name = 'fastener_select';
@@ -558,25 +709,17 @@ function pw_inject_fastener_handler() {
     <?php
 }
 
-// ============================================================================
-// ДОБАВЛЕНИЕ В КОРЗИНУ (ОБНОВЛЕННЫЙ ХЕНДЛЕР)
-// ============================================================================
-
-// Флаг чтобы не добавлять крепеж рекурсивно
 $GLOBALS['pw_fastener_adding'] = false;
 
 add_action('woocommerce_add_to_cart', 'pw_add_fastener_to_cart', 20, 6);
 function pw_add_fastener_to_cart($cart_item_key, $product_id, $quantity, $variation_id, $variation_data, $cart_item_data) {
-    // Если крепеж уже добавляется - выходим чтобы избежать рекурсии
     if (!empty($GLOBALS['pw_fastener_adding'])) {
         return;
     }
     
-    // Получаем выбранный крепеж и его количество из POST
     $fastener_id = !empty($_POST['fastener_select']) ? intval($_POST['fastener_select']) : 0;
     $fastener_qty = !empty($_POST['fastener_packs_needed']) ? intval($_POST['fastener_packs_needed']) : 0;
     
-    // Если крепеж не выбран или количество = 0, не добавляем
     if (!$fastener_id || $fastener_qty <= 0) {
         return;
     }
@@ -586,7 +729,6 @@ function pw_add_fastener_to_cart($cart_item_key, $product_id, $quantity, $variat
         return;
     }
     
-    // ГЛАВНАЯ ПРОВЕРКА: ищем уже добавленный крепеж этого товара
     $cart = WC()->cart->get_cart();
     $found_key = false;
     
@@ -600,21 +742,15 @@ function pw_add_fastener_to_cart($cart_item_key, $product_id, $quantity, $variat
     }
     
     if ($found_key !== false) {
-        // Крепеж уже в корзине для этого товара - ничего не делаем
         return;
     }
     
-    // Крепеж не найден - добавляем новый
     $GLOBALS['pw_fastener_adding'] = true;
     WC()->cart->add_to_cart($fastener_id, $fastener_qty, 0, array(), array(
         'added_with_product' => $product_id,
     ));
     $GLOBALS['pw_fastener_adding'] = false;
 }
-
-// ============================================================================
-// ОТОБРАЖЕНИЕ В КОРЗИНЕ
-// ============================================================================
 
 add_filter('woocommerce_cart_item_name', 'pw_fastener_cart_label', 10, 3);
 function pw_fastener_cart_label($name, $cart_item, $key) {
@@ -626,10 +762,6 @@ function pw_fastener_cart_label($name, $cart_item, $key) {
     }
     return $name;
 }
-
-// ============================================================================
-// МЕТАДАННЫЕ ЗАКАЗА
-// ============================================================================
 
 add_action('woocommerce_checkout_create_order_line_item', 'pw_save_fastener_meta', 10, 4);
 function pw_save_fastener_meta($item, $key, $values, $order) {
