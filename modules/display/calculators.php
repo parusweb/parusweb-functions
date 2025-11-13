@@ -64,6 +64,65 @@ function parusweb_render_calculators() {
             'length_max' => floatval(get_post_meta($product_id, '_calc_length_max', true)),
             'length_step' => floatval(get_post_meta($product_id, '_calc_length_step', true)) ?: 0.01,
         ];
+        
+        // НОВОЕ: Получаем размеры из WooCommerce атрибутов, если не заданы в calc_settings
+if ($calc_settings['width_min'] == 0 && $calc_settings['width_max'] == 0) {
+    // Пробуем получить ширину из атрибута товара
+    $attr_shirina = $product->get_attribute('shirina');
+    if ($attr_shirina) {
+        // Извлекаем числовое значение из строки
+        $shirina_value = floatval(preg_replace('/[^0-9.]/', '', $attr_shirina));
+        if ($shirina_value > 0) {
+            // Если значение меньше 10, считаем что это уже в мм
+            // Если больше 10, тоже считаем что в мм
+            $calc_settings['width_min'] = $shirina_value;
+            $calc_settings['width_max'] = $shirina_value;
+            $calc_settings['width_step'] = 1;
+        }
+    }
+    
+    // Если атрибута нет, пробуем стандартное поле WC width
+    if ($calc_settings['width_min'] == 0) {
+        $wc_width = floatval($product->get_width());
+        if ($wc_width > 0) {
+            // WC width хранится в сантиметрах, конвертируем в миллиметры
+            $calc_settings['width_min'] = $wc_width * 10;
+            $calc_settings['width_max'] = $wc_width * 10;
+            $calc_settings['width_step'] = 1;
+        }
+    }
+}
+
+if ($calc_settings['length_min'] == 0 && $calc_settings['length_max'] == 0) {
+    // Пробуем получить длину из атрибута товара
+    $attr_dlina = $product->get_attribute('dlina');
+    if ($attr_dlina) {
+        // Извлекаем числовое значение из строки
+        $dlina_value = floatval(preg_replace('/[^0-9.]/', '', $attr_dlina));
+        if ($dlina_value > 0) {
+            // Если значение больше 100, считаем что в мм и конвертируем в метры
+            if ($dlina_value > 100) {
+                $dlina_value = $dlina_value / 1000;
+            }
+            // Иначе считаем что уже в метрах
+            $calc_settings['length_min'] = $dlina_value;
+            $calc_settings['length_max'] = $dlina_value;
+            $calc_settings['length_step'] = 0.01;
+        }
+    }
+    
+    // Если атрибута нет, пробуем стандартное поле WC length
+    if ($calc_settings['length_min'] == 0) {
+        $wc_length = floatval($product->get_length());
+        if ($wc_length > 0) {
+            // WC length хранится в сантиметрах, конвертируем в метры
+            $calc_settings['length_min'] = $wc_length / 100;
+            $calc_settings['length_max'] = $wc_length / 100;
+            $calc_settings['length_step'] = 0.01;
+        }
+    }
+}
+        
     }
     
     $leaf_ids = array_merge([190], [191, 127, 94]);
@@ -969,7 +1028,7 @@ document.addEventListener('change', function(e) {
     // Получаем данные для фальшбалок (проверка уже была выполнена выше)
     $is_falsebalk = has_term(266, 'product_cat', get_the_ID());
     $shapes_data = array();
-    $show_falsebalk_calculator = $show_falsebalk_calc; // Используем переменную из начала функции
+    //$show_falsebalk_calc = $show_falsebalk_calc; // Используем переменную из начала функции
     
     if ($show_falsebalk_calculator) {
         $shapes_data = get_post_meta($product->get_id(), '_falsebalk_shapes_data', true);
