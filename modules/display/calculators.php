@@ -67,15 +67,31 @@ function parusweb_render_calculators() {
     $is_running_meter = is_running_meter_category($product_id);
     $is_partition_slat = is_partition_slat_category($product_id);
     
-    // Добавляем обработку категории ДПК и МПК (ID 197) и её дочерних категорий
-    $is_dpk_mpk = has_term_or_parent(197, 'product_cat', $product_id);
+// Добавляем обработку категории ДПК и МПК (ID 197) и её дочерних категорий
+    if (!function_exists('has_term_or_parent_197')) {
+        function has_term_or_parent_197($parent_term_id, $taxonomy, $product_id) {
+            if (has_term($parent_term_id, $taxonomy, $product_id)) {
+                return true;
+            }
+            $terms = wp_get_post_terms($product_id, $taxonomy, array('fields' => 'ids'));
+            if (is_wp_error($terms) || empty($terms)) {
+                return false;
+            }
+            foreach ($terms as $term_id) {
+                if (term_is_ancestor_of($parent_term_id, $term_id, $taxonomy)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+    
+    $is_dpk_mpk = has_term_or_parent_197(197, 'product_cat', $product_id);
     if ($is_dpk_mpk && !$is_target) {
         $is_target = true;
     }
-    // Отключаем услуги покраски для категории ДПК и МПК
-    if ($is_dpk_mpk) {
-        $painting_services = array();
-    }
+    
+
 $has_calc_settings = (get_post_meta($product_id, '_calc_width_min', true) && get_post_meta($product_id, '_calc_length_min', true));
 if (!$is_target && !$is_multiplier && !$has_calc_settings) {
     return;
@@ -86,6 +102,14 @@ if (!$is_target && !$is_multiplier && !$has_calc_settings) {
     $dims = extract_dimensions_from_title($title);
     $painting_services = get_available_painting_services_by_material($product_id);
     $price_multiplier = get_price_multiplier($product_id);
+    
+        // Отключаем услуги покраски для категории ДПК и МПК
+    if ($is_dpk_mpk) {
+        $painting_services = array();
+    }
+    
+    // Сохраняем флаг ДПК для JavaScript
+    $is_dpk_for_js = $is_dpk_mpk;
     
     $calc_settings = null;
     if ($is_multiplier || (get_post_meta($product_id, '_calc_width_min', true) && get_post_meta($product_id, '_calc_length_min', true))) {
@@ -402,11 +426,16 @@ function createPaintingServicesBlock(currentCategoryId) {
         <?php if($pack_area && $is_target): ?>
         const areaCalc = document.createElement('div');
         areaCalc.id = 'calc-area';
+        
+        const isDpkMpk = <?php echo isset($is_dpk_for_js) && $is_dpk_for_js ? 'true' : 'false'; ?>;
+        const unitTextDisplay = isDpkMpk ? 'штуки' : <?php echo json_encode($unit_text); ?>.replace('упаковку', 'упаковки').replace('лист', 'листа');
+        const unitTextSingle = isDpkMpk ? 'шт.' : <?php echo json_encode($unit_text); ?>;
+        
         areaCalc.innerHTML = `
             <br><h4>Расчет количества по площади</h4>
             <div style="margin-bottom: 10px;">
-                Площадь ${<?php echo json_encode($unit_text); ?>.replace('упаковку', 'упаковки').replace('лист', 'листа')}: <strong>${<?php echo $pack_area; ?>.toFixed(3)} м²</strong><br>
-                Цена за ${<?php echo json_encode($unit_text); ?>}: <strong>${(<?php echo floatval($product->get_price()); ?> * <?php echo $pack_area; ?>).toFixed(2)} ₽</strong>
+                Площадь ${unitTextDisplay}: <strong>${<?php echo $pack_area; ?>.toFixed(3)} м²</strong><br>
+                Цена за ${unitTextSingle}: <strong>${(<?php echo floatval($product->get_price()); ?> * <?php echo $pack_area; ?>).toFixed(2)} ₽</strong>
             </div>
             <label>Введите нужную площадь, м²:
                 <input type="number" min="<?php echo $pack_area; ?>" step="0.1" id="calc_area_input" placeholder="1" style="width:100px; margin-left:10px;">
@@ -424,7 +453,7 @@ function createPaintingServicesBlock(currentCategoryId) {
         const areaResult = document.getElementById('calc_area_result');
         const basePriceM2 = <?php echo floatval($product->get_price()); ?>;
         const packArea = <?php echo $pack_area; ?>;
-        const unitForms = <?php echo json_encode($unit_forms); ?>;
+        const unitForms = isDpkMpk ? ['шт.', 'шт.', 'шт.'] : <?php echo json_encode($unit_forms); ?>;
 
         function updateAreaCalc() {
             const area = parseFloat(areaInput.value);
