@@ -31,6 +31,29 @@ if (!defined('ABSPATH')) exit;
 
 add_action('woocommerce_after_add_to_cart_button', 'parusweb_render_calculators');
 
+/**
+ * Проверяет, принадлежит ли товар к указанной категории или её дочерним категориям
+ */
+if (!function_exists('has_term_or_parent')) {
+    function has_term_or_parent($parent_term_id, $taxonomy, $product_id) {
+        if (has_term($parent_term_id, $taxonomy, $product_id)) {
+            return true;
+        }
+        
+        $terms = wp_get_post_terms($product_id, $taxonomy, array('fields' => 'ids'));
+        if (is_wp_error($terms) || empty($terms)) {
+            return false;
+        }
+        
+        foreach ($terms as $term_id) {
+            if (term_is_ancestor_of($parent_term_id, $term_id, $taxonomy)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+}
 
 function parusweb_render_calculators() {
     if (!is_product()) return;
@@ -44,9 +67,19 @@ function parusweb_render_calculators() {
     $is_running_meter = is_running_meter_category($product_id);
     $is_partition_slat = is_partition_slat_category($product_id);
     
-    if (!$is_target && !$is_multiplier) {
-        return;
+    // Добавляем обработку категории ДПК и МПК (ID 197) и её дочерних категорий
+    $is_dpk_mpk = has_term_or_parent(197, 'product_cat', $product_id);
+    if ($is_dpk_mpk && !$is_target) {
+        $is_target = true;
     }
+    // Отключаем услуги покраски для категории ДПК и МПК
+    if ($is_dpk_mpk) {
+        $painting_services = array();
+    }
+$has_calc_settings = (get_post_meta($product_id, '_calc_width_min', true) && get_post_meta($product_id, '_calc_length_min', true));
+if (!$is_target && !$is_multiplier && !$has_calc_settings) {
+    return;
+}
     
     $title = $product->get_name();
     $pack_area = extract_area_with_qty($title, $product_id);
@@ -55,7 +88,8 @@ function parusweb_render_calculators() {
     $price_multiplier = get_price_multiplier($product_id);
     
     $calc_settings = null;
-    if ($is_multiplier) {
+    if ($is_multiplier || (get_post_meta($product_id, '_calc_width_min', true) && get_post_meta($product_id, '_calc_length_min', true))) {
+
         $calc_settings = [
             'width_min' => floatval(get_post_meta($product_id, '_calc_width_min', true)),
             'width_max' => floatval(get_post_meta($product_id, '_calc_width_max', true)),
@@ -64,7 +98,12 @@ function parusweb_render_calculators() {
             'length_max' => floatval(get_post_meta($product_id, '_calc_length_max', true)),
             'length_step' => floatval(get_post_meta($product_id, '_calc_length_step', true)) ?: 0.01,
         ];
-        
+        // Проверка наличия калькулятора крепежа
+$has_fastener_calc = false;
+$fastener_config = get_post_meta($product_id, '_fastener_config', true);
+if (!empty($fastener_config['enabled'])) {
+    $has_fastener_calc = true;
+}
         // НОВОЕ: Получаем размеры из WooCommerce атрибутов, если не заданы в calc_settings
 if ($calc_settings['width_min'] == 0 && $calc_settings['width_max'] == 0) {
     // Пробуем получить ширину из атрибута товара
@@ -165,7 +204,8 @@ const paintingServices = <?php echo json_encode($painting_services); ?>;
 const priceMultiplier = <?php echo $price_multiplier; ?>;
 const isMultiplierCategory = <?php echo $is_multiplier ? 'true' : 'false'; ?>;
 const calcSettings = <?php echo $calc_settings ? json_encode($calc_settings) : 'null'; ?>;
-
+const hasFastenerCalc = <?php echo $has_fastener_calc ? 'true' : 'false'; ?>;
+const fastenerConfig = <?php echo !empty($fastener_config) ? json_encode($fastener_config) : 'null'; ?>;
 // Теперь DOMContentLoaded
 document.addEventListener('DOMContentLoaded', function() {
     let form = document.querySelector('form.cart') || 
@@ -290,7 +330,8 @@ if (productCatIds.includes(273)) {
         const isSquareMeter = <?php echo $is_square_meter ? 'true' : 'false'; ?>;
         const isRunningMeter = <?php echo $is_running_meter ? 'true' : 'false'; ?>;
         const calcSettings = <?php echo $calc_settings ? json_encode($calc_settings) : 'null'; ?>;
-
+const hasFastenerCalc = <?php echo $has_fastener_calc ? 'true' : 'false'; ?>;
+const fastenerConfig = <?php echo !empty($fastener_config) ? json_encode($fastener_config) : 'null'; ?>;
         function getRussianPlural(n, forms) {
             n = Math.abs(n);
             n %= 100;
@@ -1019,6 +1060,61 @@ document.addEventListener('change', function(e) {
             return;
         }
     }
+    
+    // ============================================================================
+// БЛОК КАЛЬКУЛЯТОРА КРЕПЕЖА ДЛЯ МНОЖИТЕЛЯ
+// ============================================================================
+
+if (hasFastenerCalc && fastenerConfig) {
+    setTimeout(() => {
+        const fastenerBlock = document.createElement('div');
+        fastenerBlock.id = 'fastener-calculator-block';
+        fastenerBlock.style.cssText = 'margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px; border:2px solid #e0e0e0;';
+        
+        let fastenerHTML = '<h4 style="margin-bottom:15px;">Калькулятор крепежа</h4>';
+        fastenerHTML += '<p style="margin-bottom:10px; color:#666;">Автоматический расчет количества крепежа на основе размеров доски</p>';
+        fastenerHTML += '<div id="fastener_result" style="margin-top:10px;"></div>';
+        
+        fastenerBlock.innerHTML = fastenerHTML;
+        multCalc.appendChild(fastenerBlock);
+        
+        window.updateFastenerCalc = function() {
+            const widthValue = parseFloat(multWidthEl.value);
+            const lengthValue = parseFloat(multLengthEl.value);
+            const quantity = (quantityInput && !isNaN(parseInt(quantityInput.value))) ? parseInt(quantityInput.value) : 1;
+            const fastenerResult = document.getElementById('fastener_result');
+            
+            if (!widthValue || !lengthValue) {
+                fastenerResult.innerHTML = '';
+                return;
+            }
+            
+            const area = (widthValue / 1000) * lengthValue * quantity;
+            const fastenerQty = Math.ceil((area / (widthValue / 1000)) * fastenerConfig.coefficient);
+            
+            let resultHTML = '<div style="padding:10px; background:#fff; border-radius:5px;">';
+            resultHTML += '<div style="font-size:1.1em;">Необходимо крепежа: <strong>' + fastenerQty + ' шт</strong></div>';
+            resultHTML += '<div style="font-size:0.9em; color:#666; margin-top:5px;">Расчет: площадь ' + area.toFixed(2) + ' м² / ширина доски ' + (widthValue/1000).toFixed(3) + ' м × коэффициент ' + fastenerConfig.coefficient + '</div>';
+            resultHTML += '</div>';
+            
+            fastenerResult.innerHTML = resultHTML;
+            
+            removeHiddenFields('fastener_');
+            addHiddenField('fastener_qty', fastenerQty);
+            addHiddenField('fastener_width', widthValue);
+            addHiddenField('fastener_area', area.toFixed(3));
+        };
+        
+        multWidthEl.addEventListener('change', window.updateFastenerCalc);
+        multLengthEl.addEventListener('change', window.updateFastenerCalc);
+        multWidthEl.addEventListener('input', window.updateFastenerCalc);
+        multLengthEl.addEventListener('input', window.updateFastenerCalc);
+        
+        if (quantityInput) {
+            quantityInput.addEventListener('change', window.updateFastenerCalc);
+        }
+    }, 100);
+}
 });
 
 
